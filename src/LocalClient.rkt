@@ -96,7 +96,7 @@
       
       (define/public (start-accepting)
         (lock-mutex m-accp-mut)
-        (unless (m-is-accepting)
+        (unless m-is-accepting
           (set! m-should-accept #t)
           (set! m-tcplistener (tcp-listen (get-port) 10 #t))
           (set! m-accept-thread (thread (lambda () (send this accept-loop)))))
@@ -104,7 +104,7 @@
       
       (define/public (stop-accepting)
         (lock-mutex m-accp-mut)
-        (when (m-is-accepting)
+        (when m-is-accepting
           (set! m-should-accept #f)
           (thread-wait m-accept-thread))
         (unlock-mutex m-accp-mut))
