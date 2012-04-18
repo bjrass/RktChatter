@@ -63,7 +63,17 @@
         (display* "Failed to connect to " (send client get-hostname) " " (send client get-port) "\n"))
       
       (define/public (client-message message client)
-        (display* (send client get-username) " Message: " message "\n"))
+        (let ((role (car message)) (args (cdr message)))
+          (cond
+            ((= role 0)
+             (display* (send client get-username) " says: " args)
+             (newline))
+            
+            ((= role 1)
+             (send client set-username! args))
+            
+            (else
+             (display* "Unknown role: " role " sent")))))
       
       (define/public (connect host port-no)
         (let ((key (cons host port-no)))
@@ -74,7 +84,10 @@
               (send client connect (get-port))))
           (send m-connections find key)))
       
-      (define/public (is-accepting?)
+      ; \remark
+      ; internals does not use this member as they should unlock the associated
+      ; mutex first after they have have done what they intend to do.
+      (define/public (is-accepting?) 
         (let ((ret #f))
           (lock-mutex m-accp-mut)
           (set! ret m-is-accepting)
@@ -82,16 +95,30 @@
           ret))
       
       (define/public (start-accepting)
-        (unless (is-accepting?)
+        (lock-mutex m-accp-mut)
+        (unless (m-is-accepting)
           (set! m-should-accept #t)
           (set! m-tcplistener (tcp-listen (get-port) 10 #t))
-          (set! m-accept-thread (thread (lambda () (send this accept-loop))))))
+          (set! m-accept-thread (thread (lambda () (send this accept-loop)))))
+        (unlock-mutex m-accp-mut))
       
       (define/public (stop-accepting)
-        (when (is-accepting?)
+        (lock-mutex m-accp-mut)
+        (when (m-is-accepting)
           (set! m-should-accept #f)
-          (thread-wait m-accept-thread)))
+          (thread-wait m-accept-thread))
+        (unlock-mutex m-accp-mut))
+      
+           
+      (define/public (broadcast message)
+        (define (iter next)
+          (unless (send next finished?)
+            (send (send next value) send-message message)
+            (iter (send next next))))
+        (iter (send m-connections getIterator)))
+      
+      (define/override (set-username! name)
+        (super set-username! name)
+        (broadcast (cons 1 name)))
       
       ))(provide LocalClient%))
-
-; Internals shouldn't use is-accepting?, they should lock the mutex until they are done.
