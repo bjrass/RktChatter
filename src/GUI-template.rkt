@@ -28,7 +28,7 @@
 (new text-field% [parent connect-pane] [label "host"] [style '(single)] [init-value "localhost"])
 (new text-field% [parent connect-pane] [label "port"] [style '(single)] [init-value "9000"])
 (new button% [parent right-vpane] [label "connect"])
-(new button% [parent right-vpane] [label "UDP LAN-broadcast"])
+(new check-box% [parent right-vpane] [label "UDP LAN-broadcast"])
 
 ; Show the frame by calling its show method
 (send frame show #t)
