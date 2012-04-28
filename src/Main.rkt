@@ -4,17 +4,20 @@
 (require (file "LocalClient.rkt"))
 (require (file "NetworkClient.rkt"))
   
-(define foo (new LocalClient% [port 9000]))
 (define bar (new LocalClient% [port 10000]))
-(define loo (new LocalClient% [port 8000]))
+(define foo (new LocalClient% [port 9000]))
 
 (send foo start-accepting)
+
 (define bar-nwc (send bar connect "localhost" 9000))
-(define loo-nwc (send loo connect "localhost" 9000))
 
 ; The clients actually aren't connected yet, there should either be a lock or a wait-for-connect
 
-(sleep 3)
+(sleep 1)
 
-(send bar-nwc send-message (cons 0 "Message 1"))
-(send loo-nwc send-message (cons 0 "Message 2"))
+(send foo create-encryption!)
+
+(sleep 1)
+
+(send bar set-username! "I AM FOO!")
+(send bar-nwc send-message 0 "HELLO OMGH!")

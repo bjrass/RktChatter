@@ -2,6 +2,7 @@
   (require (file "Common.rkt"))
   (require (file "Client.rkt"))
   (require (file "Mutex.rkt"))
+  (require (file "rsa.rkt"))
   
   ;; \brief
   ;; Interface for processing messages from a NetworkClient%
@@ -23,6 +24,23 @@
       (define m-listener TRUE-NULL)
       (define m-listen-thread TRUE-NULL)
       (define m-is-connected #f)
+      
+      ; TODO Make encryption cleaner
+      (define m-encryption #f)
+      
+      (define/public (get-encryption)
+        m-encryption)
+      
+      (define/public (set-encryption! encryption)
+        (set! m-encryption encryption))
+      
+      (define/public (encrypt-string string)
+        (cond
+          ((eq? m-encryption #f)
+           string)
+          
+          (else
+           (encrypt-string->list string m-encryption))))
       
       ;; Mutex for locking when this client is about to connect or disconnect
       (define m-conn-mut (make-mutex))
@@ -46,12 +64,13 @@
         (define (loop)
           (when m-should-listen
             (if (sync/timeout 0.1 m-inport)
-              (let ((message (read m-inport)))
-                (unless (eof-object? message)
-                  (unless (TRUE-NULL? m-listener)
-                    (send m-listener client-message message this))
-                  (loop)))
-              (loop))))
+                (let ((message (read m-inport)))
+                  (unless (eof-object? message)
+                    (unless (TRUE-NULL? m-listener)
+                      (send m-listener client-message
+                            (car message) (cdr message) this))
+                    (loop)))
+                (loop))))
         (loop)
         
         (lock-mutex m-conn-mut)
@@ -94,9 +113,14 @@
           (set! m-should-listen #f)
           (thread-wait m-listen-thread)))
       
-      (define/public (send-message data)
-        (when (is-connected?) 
-          (write data m-outport)
-          (flush-output m-outport)))
+      (define/public (send-message role data (encrypted #t))
+        (let ((message #f))
+          (if encrypted
+              (set! message (encrypt-string data))
+              (set! message data))
+          
+          (when (is-connected?) 
+            (write (cons role message) m-outport)
+            (flush-output m-outport))))
       
       ))(provide NetworkClientListener<%> NetworkClient%))

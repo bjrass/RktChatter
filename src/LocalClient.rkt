@@ -4,6 +4,8 @@
   (require (file "Client.rkt"))
   (require (file "NetworkClient.rkt"))
   (require (file "Map.rkt"))
+  (require (file "rsa.rkt"))
+  ; TODO Make encryption cleaner
   
   ;; \brief
   ;; A Client% for the messaging service running on the local computer.
@@ -24,6 +26,22 @@
       (define m-accept-thread TRUE-NULL)
       (define m-tcplistener TRUE-NULL)
       (define m-accp-mut (make-mutex))
+      
+      ; TODO Make encryption cleaner
+      ; TODO Send encryption on connect
+      (define m-encryption #f)
+      (define/public (create-encryption!)
+        (set! m-encryption (make-keys))
+        (broadcast 2 (get-public-key m-encryption) #f))
+      (define/public (get-encryption)
+        m-encryption)
+      
+      (define/public (decrypt-message message)
+        (cond
+          ((eq? m-encryption #f)
+           message)
+          
+          (else (decrypt-list->string message (get-private-key m-encryption)))))
       
       (define/private (accept)
         (let*-values (((inport outport) (tcp-accept m-tcplistener))
@@ -54,26 +72,35 @@
         (unlock-mutex m-accp-mut))
       
       (define/public (client-connect client)
-        (display* "Connected to " (send client get-hostname) " " (send client get-port) "\n"))
+        (display* "Connected to " (send client get-hostname) " "
+                  (send client get-port) "\n"))
       
       (define/public (client-disconnect client)
-        (display* "Disconnected from " (send client get-hostname) " " (send client get-port) "\n"))
+        (display* "Disconnected from " (send client get-hostname) " "
+                  (send client get-port) "\n"))
       
       (define/public (client-connect-fail client)
-        (display* "Failed to connect to " (send client get-hostname) " " (send client get-port) "\n"))
+        (display* "Failed to connect to " (send client get-hostname) " "
+                  (send client get-port) "\n"))
       
-      (define/public (client-message message client)
-        (let ((role (car message)) (args (cdr message)))
-          (cond
-            ((= role 0)
-             (display* (send client get-username) " says: " args)
-             (newline))
-            
-            ((= role 1)
-             (send client set-username! args))
-            
-            (else
-             (display* "Unknown role: " role " sent")))))
+      ; TODO Make encryption cleaner
+      (define/public (client-message role args client)
+        (cond
+          ; Send message
+          ((= role 0)
+           (display* (send client get-username) " says: " (decrypt-message args))
+           (newline))
+          
+          ; Set username
+          ((= role 1)
+           (send client set-username! (decrypt-message args)))
+          
+          ; Set public key
+          ((= role 2)
+           (send client set-encryption! args))
+          
+          (else
+           (display* "Message of unknown role: " role " sent"))))
       
       (define/public (connect host port-no)
         (let ((key (cons host port-no)))
@@ -110,15 +137,16 @@
         (unlock-mutex m-accp-mut))
       
            
-      (define/public (broadcast message)
+      (define/public (broadcast role message (encrypted #t))
         (define (iter next)
           (unless (send next finished?)
-            (send (send next value) send-message message)
+            (send (send next value) send-message role message encrypted)
             (iter (send next next))))
         (iter (send m-connections getIterator)))
       
+      ; TODO Send username on connect
       (define/override (set-username! name)
         (super set-username! name)
-        (broadcast (cons 1 name)))
+        (broadcast 1 name))
       
       ))(provide LocalClient%))

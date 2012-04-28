@@ -1,9 +1,14 @@
+
 ;81.920 primes, last prime: 1047119
 
-(define biggest-prime 1047119)
-(define number-of-primes 81920)
-
-(define list-of-prime-num '(         2         3         5         7        11        13        17        19 
+(module PrimeNumbers racket
+  
+  (provide biggest-prime number-of-primes list-of-prime-num)
+  (define biggest-prime 1047119)
+  (define number-of-primes 81920)
+  
+  (define list-of-prime-num '(
+         2         3         5         7        11        13        17        19 
 
         23        29        31        37        41        43        47        53 
 
@@ -20481,4 +20486,4 @@
 
    1046917   1046933   1046951   1046959   1046977   1046993   1046999   1047031 
 
-   1047041   1047043   1047061   1047077   1047089   1047097   1047107   1047119))
+   1047041   1047043   1047061   1047077   1047089   1047097   1047107   1047119)))
