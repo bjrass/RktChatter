@@ -8,8 +8,8 @@
       (super-new)
       
       (init hostname)
-      (init (port 9000))
-      (init (username TRUE-NULL))
+      (init [port 9000])
+      (init [username TRUE-NULL])
       
       (define m-username username)
       (define m-hostname hostname)

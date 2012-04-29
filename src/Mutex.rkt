@@ -1,11 +1,9 @@
 ;; \brief
-;; Implemented by using a semaphore, but
-;; using mutexes will be so much more common
-;; in this project.
+;; The mutex is in fact a semaphore, but
+;; most of the time mutexes are what's needed
 (module Mutex racket
-  (define (make-mutex) (cons 'mutex (make-semaphore 1)))
-  (define (lock-mutex mut) (semaphore-wait (cdr mut)))
-  (define (unlock-mutex mut) (semaphore-post (cdr mut)))
-  (define (is-mutex? mut) (and (pair? mut) (eq? (car mut) 'mutex) (semaphore? (cdr mut))))
+  (define (make-mutex) (make-semaphore 1))
+  (define (lock-mutex mut (timeout #f)) (sync/timeout timeout mut))
+  (define (unlock-mutex mut) (semaphore-post mut))
   
-  (provide make-mutex lock-mutex unlock-mutex is-mutex?))
+  (provide make-mutex lock-mutex unlock-mutex))

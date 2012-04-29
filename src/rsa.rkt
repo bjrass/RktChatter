@@ -1,5 +1,5 @@
 (module RsaCodec racket
-  (require (file "prime numbers.rkt"))
+  (require (file "PrimeNumbers.rkt"))
   
   ; returns all the prime factors to the number n, 
   ; if n's biggest factor is less then the biggest prime in "prime numbers.rkt"
@@ -66,7 +66,7 @@
         (make-d_help ee (+ d 1) m)))
   
   ; (make-keys) -> ((public common) (private common))
-  (define (make-keys)
+  (define (Rsa:make-keys)
     (let ((temp 0)(p 0)(q 0)(n 0)(m 0)(ee 0)(d 0))
       (begin
         (set! temp (two-prime-num-between 10 20)) ;higher a and b gives better keys but are slower to decrypt. (two-prime-num-between a b) (a < b)
@@ -79,7 +79,7 @@
         (list (list ee n) (list d n)))))
   
   
-  (define key (make-keys))
+  (define key (Rsa:make-keys))
   (define pub (car key))
   (define priv (car (cdr key)))
   
@@ -100,7 +100,7 @@
        (diff-test diff (cdr list)))))
   
   (define (make-true-keys)
-    (let ((key (make-keys))(pub '()) (priv '()))
+    (let ((key (Rsa:make-keys))(pub '()) (priv '()))
       (begin
         (set! pub (car key))
         (set! priv (car (cdr key)))
@@ -140,32 +140,27 @@
   
   
   ;((521 2697293) (2647097 2697293))  
-  ;(1038653 2616944 2542118 2147402 2245310 380487 629265 1640570 1)  
+  ;(1038653 2616944 2542118 2147402 2245310 380487 629265 1640570 1) 
   
-  (define (string/list-conv arg)
-    (cond
-      ((string? arg)
-       (bytes->list (string->bytes/utf-8 arg)))
-      
-      ((list? arg)
-       (bytes->string/utf-8 (call-total arg)))
-      
-      (else
-       'error)))
+  (define (string->list str)
+    (bytes->list (string->bytes/utf-8 str)))
   
-  (define (encrypt-string->list str pub-key)
-    (encrypt-list (string/list-conv str) pub-key))
+  (define (list->string list)
+    (bytes->string/utf-8 (list->bytes list)))
   
-  (define (decrypt-list->string lst priv-key)
-    (string/list-conv (decrypt-list lst priv-key)))
+  (define (Rsa:encrypt-string->list str pub-key)
+    (encrypt-list (string->list str) pub-key))
   
-  (define (get-private-key keys)
+  (define (Rsa:decrypt-list->string lst priv-key)
+    (list->string (decrypt-list lst priv-key)))
+  
+  (define (Rsa:get-private-key keys)
     (car (cdr keys)))
   
-  (define (get-public-key keys)
+  (define (Rsa:get-public-key keys)
     (car keys))
   
-  (provide make-keys encrypt-string->list decrypt-list->string get-private-key get-public-key))
+  (provide Rsa:make-keys Rsa:encrypt-string->list Rsa:decrypt-list->string Rsa:get-private-key Rsa:get-public-key))
 
 ; KEYS FOR TESTING:
 ; ((5 26569) (5249 26569)) for "I AM FOO!"

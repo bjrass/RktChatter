@@ -45,7 +45,7 @@
       
       ;; \brief
       ;; Creates a new iterator for iterating the map
-      (define/public (getIterator) (new Iterator% [map m-internal-map]))
+      (define/public (get-iterator) (new Iterator% [map m-internal-map]))
       
       ;; \brief
       ;; Gives whether the map is empty

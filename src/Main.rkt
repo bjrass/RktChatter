@@ -1,23 +1,24 @@
 (require (file "Common.rkt"))
-(require (file "Map.rkt"))
 (require (file "Client.rkt"))
 (require (file "LocalClient.rkt"))
 (require (file "NetworkClient.rkt"))
-  
+
+; Create a client on localhost:10000
 (define bar (new LocalClient% [port 10000]))
+; Create a client on localhost:9000
 (define foo (new LocalClient% [port 9000]))
-
+; Tell one of the clients to start accepting incoming connections
 (send foo start-accepting)
-
+; Connect the two clients
 (define bar-nwc (send bar connect "localhost" 9000))
+; Wait for the connection attempt to finish
+(send bar-nwc wait-for-connect)
+; Tell foo to create a new encryption
+; (send foo create-encryption!)
 
-; The clients actually aren't connected yet, there should either be a lock or a wait-for-connect
+; Wait (Locks must be applied...)
+; (sleep 1)
 
-(sleep 1)
-
-(send foo create-encryption!)
-
-(sleep 1)
-
+; Start messaging!
 (send bar set-username! "I AM FOO!")
-(send bar-nwc send-message 0 "HELLO OMGH!")
+(send bar-nwc send-message "HELLO OMGH!")
