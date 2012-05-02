@@ -1,5 +1,6 @@
 (module LocalClient racket
   (require (file "Common.rkt"))
+  (require (file "Debug.rkt"))
   (require (file "Mutex.rkt"))
   (require (file "Client.rkt"))
   (require (file "NetworkClient.rkt"))
@@ -7,6 +8,7 @@
   (require (file "Rsa.rkt"))
   (require (file "RsaCodec.rkt"))
   ; TODO Make encryption cleaner
+  ; TODO This class is veery thread-unsafe
   
   ;; \brief
   ;; A Client% for the messaging service running on the local computer.
@@ -17,6 +19,7 @@
       (super-new [hostname "localhost"])
       
       (inherit get-port)
+      (inherit get-username)
       
       ;; Map of all clients that are connected or is connecting
       ; TODO A problem is, a host can have multiple aliases
@@ -34,24 +37,29 @@
       
       (define m-codec (new RsaCodec%))
       
-      ; TODO Make encryption cleaner
-      ; TODO Send encryption on connect
+      (define/public (get-codec)
+        m-codec)
+      
       (define/public (create-encryption!)
         (send m-codec set-keys! (Rsa:make-keys))
-        (broadcast (send m-codec get-packed-encoder) 2 #f))
+        
+        (define (iter next)
+          (unless (send next finished?)
+            (send (send next value) request-codec-update (lambda () (send m-codec copy)))))
+        (iter (send m-connections get-iterator)))
       
       (define/private (accept)
         (let*-values (((inport outport) (tcp-accept m-tcplistener))
                       ((myhost myport-no host port-no) (tcp-addresses outport #t))
-                      ((client) (new NetworkClient% [hostname host] [port port-no])))
+                      ((client) (new NetworkClient% [codec m-codec] [hostname host] [port port-no])))
           (send m-connections put! (cons host port-no) client)
           (send client set-listener! this)
           (send client accept-connect inport outport)))
       
       ; Would preferrably be made private in some way, though it must be started by a new thread so...
-      (define/public (accept-loop)
+      (define (accept-loop)
         (define (loop)
-          (sync/timeout 0.2 m-tcplistener)
+          (sync/timeout 0.1 m-tcplistener)
           (when (= m-accept-state STATE_ACCEPTING)
             (when (tcp-accept-ready? m-tcplistener)
               (accept))
@@ -66,59 +74,55 @@
         (unlock-mutex m-accp-mut))
       
       (define/public (client-connect client)
-        (display* "Connected to " (send client get-hostname) " "
-                  (send client get-port) "\n"))
+        (when (string? (send this get-username))
+          (send client send-message (send this get-username) 1)))
+      
+      ;(display* "Connected to " (send client get-hostname) " "
+      ;          (send client get-port) "\n"))
       
       (define/public (client-disconnect client)
-        (display* "Disconnected from " (send client get-hostname) " "
-                  (send client get-port) "\n"))
+        (Dbg:feedback (list "LocalClient " "\"" (get-username) "\"")
+                      "client-disconnect" (send client get-hostname) ":" (send client get-port)))
       
       (define/public (client-connect-fail client exceptions)
-        (display* "Failed to connect to " (send client get-hostname) " "
-                  (send client get-port) ":\n" exceptions "\n"))
+        (Dbg:feedback (list "LocalClient " "\"" (get-username) "\"")
+                      "client-connect-fail" (send client get-hostname) ":" (send client get-port) "\n..." exceptions))
       
-      ; TODO Roles should be internal, all user messages should be of role 0
-      (define/public (client-message role args client)
+      (define/public (client-message client role args)
         (cond
-          ; Send message
+          ; Message sent by client
           ((= role 0)
-           (display* (send client get-username) " says: " (send m-codec decode args))
+           (display* (send client get-username) " says: " args)
            (newline))
           
-          ; Set username
+          ; Set username of client
           ((= role 1)
-           (send client set-username! (send m-codec decode args)))
-          
-          ; Set public key
-          ((= role 2)
-           (send client set-encoding! args))
+           (Dbg:feedback (list "LocalClient " "\"" (get-username) "\"")
+                         "client-message" "Setting username of " (send client get-hostname) ":" (send client get-port))
+           (send client set-username! args))
           
           (else
-           (display* "Message of unknown role: " role " sent"))))
+           (Dbg:feedback (list "LocalClient " "\"" (get-username) "\"")
+                         "client-message" "Unknown role message from " (send client get-hostname) ":" (send client get-port)))))
       
       (define/public (connect host port-no)
         (let ((key (cons host port-no)))
           (unless (send m-connections has? key)
-            (let ((client (new NetworkClient% [hostname host] [port port-no])))
+            (let ((client (new NetworkClient% [codec (send m-codec copy)] [hostname host] [port port-no])))
               (send m-connections put! key client)
               (send client set-listener! this)
               (send client connect #f)))
           (send m-connections find key)))
       
-      ; TODO Excessive locking?
       (define/public (is-accepting?) 
-        (let ((ret #f))
-          (lock-mutex m-accp-mut)
-          (set! ret (= m-accept-state STATE_ACCEPTING))
-          (unlock-mutex m-accp-mut)
-          ret))
+        (= m-accept-state STATE_ACCEPTING))
       
       (define/public (start-accepting)
         (lock-mutex m-accp-mut)
         (when (= m-accept-state STATE_IDLE)
           (set! m-accept-state STATE_ACCEPTING)
           (set! m-tcplistener (tcp-listen (get-port) 10 #t))
-          (set! m-accept-thread (thread (lambda () (send this accept-loop)))))
+          (set! m-accept-thread (thread (lambda () (accept-loop)))))
         (unlock-mutex m-accp-mut))
       
       (define/public (stop-accepting)
@@ -139,15 +143,15 @@
             (iter (send next next))))
         (iter (send m-connections get-iterator)))
       
+      (define/override (set-username! name)
+        (super set-username! name)
+        (when (string? name)
+          (broadcast name 1)))
+      
       (define/public (disconnect-all)
         (define (iter next)
           (unless (send next finished?)
             (send (send next value) request-disconnect)))
         (iter (send m-connections get-iterator)))
-      
-      ; TODO Send username on connect
-      (define/override (set-username! name)
-        (super set-username! name)
-        (broadcast name 1))
       
       ))(provide LocalClient%))

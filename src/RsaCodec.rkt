@@ -7,8 +7,11 @@
     (class object%
       (super-new)
       
-      (define m-private-key TRUE-NULL)
-      (define m-public-key TRUE-NULL)
+      (init [private-key TRUE-NULL])
+      (init [public-key TRUE-NULL])
+      
+      (define m-private-key private-key)
+      (define m-public-key public-key)
       
       (define/public (get-private-key)
         m-private-key)
@@ -33,6 +36,9 @@
       (define/public (decode data)
         (if (TRUE-NULL? m-private-key)
             data
-            (Rsa:decrypt-list->string data m-private-key)))))
+            (Rsa:decrypt-list->string data m-private-key)))
+      
+      (define/public (copy)
+        (new RsaCodec% [private-key m-private-key] [public-key m-public-key]))))
   
   (provide RsaCodec%))

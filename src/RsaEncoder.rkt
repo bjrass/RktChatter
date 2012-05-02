@@ -20,7 +20,7 @@
       (define/public (encode data)
         (if (TRUE-NULL? m-public-key)
             data
-            (Rsa:encrypt-string->list string m-public-key)))
+            (Rsa:encrypt-string->list data m-public-key)))
       
       (define/public (pack)
         m-public-key)

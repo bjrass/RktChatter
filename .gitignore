@@ -1,4 +1,5 @@
 # Ignore Dr.Racket's backup files in /src #
 ###########################################
+src/*
 !src/*.rkt
 .DS_Store*

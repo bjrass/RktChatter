@@ -1,12 +1,14 @@
 (module Common racket
-  ;; Symbol mean't to replace racket's inadequate null
+  
+  ;; Symbol meant to replace racket's inadequate null
   ;; The main reason why it is inadequate is that it
   ;; overlaps it's definition with the definition of an
-  ;; empty list.
+  ;; empty list (the list is null-terminated WITH the null
+  ;; type, giving it too much purpose)
   (define TRUE-NULL 'NULL)
   
   (define (TRUE-NULL? something)
-    (eq? something TRUE-NULL))
+    (eq? something TRUE-NULL))  
   
   (define (display* . args)
     (define (iter remn)
