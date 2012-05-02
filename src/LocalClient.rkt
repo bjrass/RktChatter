@@ -4,7 +4,7 @@
   (require (file "Mutex.rkt"))
   (require (file "Client.rkt"))
   (require (file "NetworkClient.rkt"))
-  (require (file "Map.rkt"))
+  (require (file "ArrayList.rkt"))
   (require (file "Rsa.rkt"))
   (require (file "RsaCodec.rkt"))
   ; TODO Make encryption cleaner
@@ -21,10 +21,9 @@
       (inherit get-port)
       (inherit get-username)
       
-      ;; Map of all clients that are connected or is connecting
-      ; TODO A problem is, a host can have multiple aliases
-      (define m-connections (new Map%))
-      (define m-conc-mut (make-mutex))
+      ;; List of all clients that are connected or is connecting
+      (define m-connections (new ArrayList%))
+      (define m-conn-mut (make-mutex))
       
       (define m-accp-mut (make-mutex))
       (define STATE_IDLE 0)
@@ -43,20 +42,28 @@
       (define/public (create-encryption!)
         (send m-codec set-keys! (Rsa:make-keys))
         
-        (define (iter next)
-          (unless (send next finished?)
-            (send (send next value) request-codec-update (lambda () (send m-codec copy)))))
-        (iter (send m-connections get-iterator)))
+        (define (iter i)
+          (when (>= i 0)
+            (send (send m-connections get-at i)
+                  request-codec-update (lambda () (send m-codec copy)))
+            (iter (- i 1))))
+        (lock-mutex m-conn-mut)
+        (iter (- (send m-connections get-size) 1))
+        (unlock-mutex m-conn-mut))
       
       (define/private (accept)
         (let*-values (((inport outport) (tcp-accept m-tcplistener))
                       ((myhost myport-no host port-no) (tcp-addresses outport #t))
                       ((client) (new NetworkClient% [codec m-codec] [hostname host] [port port-no])))
-          (send m-connections put! (cons host port-no) client)
+          (lock-mutex m-conn-mut)
+          (send m-connections append! client)
+          (unlock-mutex m-conn-mut)
           (send client set-listener! this)
-          (send client accept-connect inport outport)))
+          (send client accept-connect inport outport)
+          
+          ; TODO
+          (clients-changed)))
       
-      ; Would preferrably be made private in some way, though it must be started by a new thread so...
       (define (accept-loop)
         (define (loop)
           (sync/timeout 0.1 m-tcplistener)
@@ -74,45 +81,81 @@
         (unlock-mutex m-accp-mut))
       
       (define/public (client-connect client)
-        (when (string? (send this get-username))
-          (send client send-message (send this get-username) 1)))
-      
-      ;(display* "Connected to " (send client get-hostname) " "
-      ;          (send client get-port) "\n"))
+        (Dbg:feedback (list "LocalClient \"" (get-username) "\"")
+                      "client-connect" (send client get-hostname) ":" (send client get-port))
+        (let ((un (get-username)))
+          (when (string? un)
+            (send client send-message un 1))))
       
       (define/public (client-disconnect client)
-        (Dbg:feedback (list "LocalClient " "\"" (get-username) "\"")
+        (Dbg:feedback (list "LocalClient \"" (get-username) "\"")
                       "client-disconnect" (send client get-hostname) ":" (send client get-port)))
       
       (define/public (client-connect-fail client exceptions)
-        (Dbg:feedback (list "LocalClient " "\"" (get-username) "\"")
+        (Dbg:feedback (list "LocalClient \"" (get-username) "\"")
                       "client-connect-fail" (send client get-hostname) ":" (send client get-port) "\n..." exceptions))
       
       (define/public (client-message client role args)
         (cond
           ; Message sent by client
           ((= role 0)
-           (display* (send client get-username) " says: " args)
-           (newline))
+           (let ((un (send client get-username)))
+             (when (TRUE-NULL? un)
+               (set! un "<noname>"))
+             (send client set-log (string-append (send client get-log) un ":  " args "\n"))
+             (log-update client)))
           
           ; Set username of client
           ((= role 1)
-           (Dbg:feedback (list "LocalClient " "\"" (get-username) "\"")
+           (Dbg:feedback (list "LocalClient \"" (get-username) "\"")
                          "client-message" "Setting username of " (send client get-hostname) ":" (send client get-port))
            (send client set-username! args))
           
           (else
-           (Dbg:feedback (list "LocalClient " "\"" (get-username) "\"")
+           (Dbg:feedback (list "LocalClient \"" (get-username) "\"")
                          "client-message" "Unknown role message from " (send client get-hostname) ":" (send client get-port)))))
       
+      ; TODO Temporary *simple* but ugly solution
+      (define/public (clients-changed)
+        #f)
+      
+      ; TODO Temporary *simple* but ugly solution
+      (define/public (log-update client)
+        #f)
+      
+      (define/public (get-client num)
+        (let ((client #f))
+          (lock-mutex m-conn-mut)
+          (set! client (send m-connections get-at num))
+          (unlock-mutex m-conn-mut)
+          client))
+      
+      (define/public (get-client-count)
+        (let ((count #f))
+          (lock-mutex m-conn-mut)
+          (set! count (send m-connections get-size))
+          (unlock-mutex m-conn-mut)
+          count))
+      
       (define/public (connect host port-no)
-        (let ((key (cons host port-no)))
-          (unless (send m-connections has? key)
-            (let ((client (new NetworkClient% [codec (send m-codec copy)] [hostname host] [port port-no])))
-              (send m-connections put! key client)
-              (send client set-listener! this)
-              (send client connect #f)))
-          (send m-connections find key)))
+        (let ((client (new NetworkClient% [codec (send m-codec copy)] [hostname host] [port port-no])))
+          (lock-mutex m-conn-mut)
+          (send m-connections append! client)
+          (unlock-mutex m-conn-mut)
+          
+          (send client set-listener! this)
+          (send client connect #f)
+          
+          ; TODO
+          (clients-changed)
+          client))
+      
+      (define/public (drop client)
+        (lock-mutex m-conn-mut)
+        (when (send m-connections remove-value client)
+          (send client request-disconnect))
+        (unlock-mutex m-conn-mut)
+        (clients-changed))
       
       (define/public (is-accepting?) 
         (= m-accept-state STATE_ACCEPTING))
@@ -137,11 +180,13 @@
            (unlock-mutex m-accp-mut))))
       
       (define/public (broadcast message [role 0] (encrypted #t))
-        (define (iter next)
-          (unless (send next finished?)
-            (send (send next value) send-message message role encrypted)
-            (iter (send next next))))
-        (iter (send m-connections get-iterator)))
+        (define (iter i)
+          (when (>= i 0)
+            (send (send m-connections get-at i) send-message message role encrypted)
+            (iter (- i 1))))
+        (lock-mutex m-conn-mut)
+        (iter (- (send m-connections get-size) 1))
+        (unlock-mutex m-conn-mut))
       
       (define/override (set-username! name)
         (super set-username! name)
@@ -149,9 +194,12 @@
           (broadcast name 1)))
       
       (define/public (disconnect-all)
-        (define (iter next)
-          (unless (send next finished?)
-            (send (send next value) request-disconnect)))
-        (iter (send m-connections get-iterator)))
+        (define (iter i)
+          (when (>= i 0)
+            (send (send m-connections get-at i) request-disconnect)
+            (iter (- i 1))))
+        (lock-mutex m-conn-mut)
+        (iter (- (send m-connections get-size) 1))
+        (unlock-mutex m-conn-mut))
       
       ))(provide LocalClient%))

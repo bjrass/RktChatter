@@ -7,16 +7,6 @@
   (require (file "RsaEncoder.rkt"))
   (require (file "Queue.rkt"))
   
-  ; This client must have a lock-client and unlock-client state
-  ; At first, the client is locked
-  ; Then, public keys, username etc... are sent
-  ; Then, unlock is sent
-  ; Now the client can operate...
-  ; Some time, lock-client will be sent
-  ; Once the client is locked, send back client-locked
-  ; Now, wait for unlock etc... (it is safe to exchange keys during this time)
-  ; After the unlock, messages buffered during the locked time will be sent
-  
   ;; \brief
   ;; Interface for processing messages from a NetworkClient%
   (define NetworkClientListener<%> (interface () client-message client-connect client-disconnect client-connect-fail))
@@ -74,6 +64,17 @@
                           TRUE-NULL
                           (send codec copy)))
       
+      ; TODO
+      ; This is kind of a temporary solution, the same with how the username is handeled.
+      ; They should be defined in a later stage, through extending this otherwise
+      ; basic networking class.
+      (define m-log "")
+      
+      (define/public (get-log)
+        m-log)
+      (define/public (set-log log)
+        (set! m-log log))
+      
       ; Callback for updating the codec
       (define m-cb-codec TRUE-NULL)
       ; Flag telling whether the codec is being updated
@@ -88,8 +89,8 @@
         (cons encoded (cons role data)))
       
       (define/private (dispatch-message message)
-        (Dbg:feedback (list "NetworkClient " (send this get-hostname) ":"
-                            (send this get-port)) "dispatch-message" message)
+        (Dbg:feedback (list "NetworkClient " (get-hostname) ":"
+                            (get-port)) "dispatch-message" message)
         (when (is-connected?)
           (let ((actual-message message))
             (when (car message)
@@ -126,8 +127,8 @@
         (when m-update-codec
           (set! m-update-codec #f)
           (set! m-codec (send (m-cb-codec) copy))
-          (Dbg:feedback (list "NetworkClient " (send this get-hostname) ":"
-                              (send this get-port)) "codec-update"
+          (Dbg:feedback (list "NetworkClient " (get-hostname) ":"
+                              (get-port)) "codec-update"
                                                     "pub: " (send m-codec get-public-key)
                                                     " priv:" (send m-codec get-private-key)))
         (unlock-mutex m-codec-mut))
@@ -153,8 +154,8 @@
         (lock-mutexes m-conn-mut m-codec-mut)
         (if (is-connected?)
             (begin
-              (Dbg:feedback (list "NetworkClient " (send this get-hostname) ":"
-                                  (send this get-port)) "request-codec-update" "while connected")
+              (Dbg:feedback (list "NetworkClient " (get-hostname) ":"
+                                  (get-port)) "request-codec-update" "while connected")
               (set! m-cb-codec get-codec-callback)
               (unless m-update-codec
                 (set! m-update-codec #t)
@@ -166,8 +167,8 @@
             ; considered connected. Otherwise, the codec could change locally but not
             ; on the remote end.
             (begin
-              (Dbg:feedback (list "NetworkClient " (send this get-hostname) ":"
-                                  (send this get-port)) "request-codec-update" "while disconnected")
+              (Dbg:feedback (list "NetworkClient " (get-hostname) ":"
+                                  (get-port)) "request-codec-update" "while disconnected")
               (set! m-codec (send (get-codec-callback) copy))))
         (unlock-mutexes m-conn-mut m-codec-mut))
       
@@ -188,23 +189,23 @@
         
         (if (>= role ROLE_USER)
             (unless (TRUE-NULL? m-listener)
-              (Dbg:feedback (list "NetworkClient " (send this get-hostname) ":"
-                                  (send this get-port)) "process-message" "user message " message)
+              (Dbg:feedback (list "NetworkClient " (get-hostname) ":"
+                                  (get-port)) "process-message" "user message " message)
               (send m-listener client-message this
                     (- role ROLE_USER) message))
             (cond
               ; Sets the public key (should only be used when the client is buffering)
               ((= role ROLE_PUBLIC_KEY)
-               (Dbg:feedback (list "NetworkClient " (send this get-hostname) ":"
-                                   (send this get-port)) "process-message" "public key " message)
+               (Dbg:feedback (list "NetworkClient " (get-hostname) ":"
+                                   (get-port)) "process-message" "public key " message)
                (unless m-buffering
                  (error "INTERNAL ERROR; PUBLIC KEY WHEN OUT OF BUFFERING MODE!"))
                (send m-encoder unpack message))
               
               ; Starts buffering and responds with a confirmation
               ((= role ROLE_START_BUFFERING)
-               (Dbg:feedback (list "NetworkClient " (send this get-hostname) ":"
-                                   (send this get-port)) "process-message" "start buffering")
+               (Dbg:feedback (list "NetworkClient " (get-hostname) ":"
+                                   (get-port)) "process-message" "start buffering")
                (start-buffering)
                (lock-mutex m-conn-mut)
                (dispatch-message (create-message #f ROLE_IS_BUFFERING null))
@@ -212,8 +213,8 @@
               
               ; Confirmation that the remote end of the client is now buffering
               ((= role ROLE_IS_BUFFERING)
-               (Dbg:feedback (list "NetworkClient " (send this get-hostname) ":"
-                                   (send this get-port)) "process-message" "is buffering")
+               (Dbg:feedback (list "NetworkClient " (get-hostname) ":"
+                                   (get-port)) "process-message" "is buffering")
                
                (lock-mutex m-conn-mut)
                (codec-update)
@@ -223,15 +224,15 @@
               
               ; Merely flushes the message queue and stops buffering
               ((= role ROLE_STOP_BUFFERING)
-               (Dbg:feedback (list "NetworkClient " (send this get-hostname) ":"
-                                   (send this get-port)) "process-message" "stop buffering")
+               (Dbg:feedback (list "NetworkClient " (get-hostname) ":"
+                                   (get-port)) "process-message" "stop buffering")
                (stop-buffering)))))
       
       ;; Extension of the message loop, this also connects the client in the message thread
       (define (connect-then-listen local-port)
         (let ((exceptions '()))
           (with-handlers (((lambda (ex) #t) (lambda (ex) (set! exceptions (cons ex exceptions)))))
-            (set!-values (m-inport m-outport) (tcp-connect (get-hostname) (get-port) local-port)))
+            (set!-values (m-inport m-outport) (tcp-connect (get-hostname) (get-port) #f local-port)))
           
           (cond
             ((null? exceptions)
