@@ -3,8 +3,10 @@
   
   (define dbg-disp-mut (make-mutex))
   
-  (define (Dbg:display-plain message)
-    (display message))
+  (define Dbg:display-plain display)
+  
+  (define (Dbg:set-base-display disp)
+    (set! Dbg:display-plain disp))
   
   (define (Dbg:flush)
     (flush-output))
@@ -40,4 +42,4 @@
     (Dbg:flush)
     (unlock-mutex dbg-disp-mut))
      
-     (provide Dbg:display Dbg:display* Dbg:feedback))
+     (provide Dbg:display Dbg:set-base-display Dbg:display* Dbg:feedback))
