@@ -44,7 +44,7 @@
       (define/public (get-at pos)
         (vector-ref m-vector pos))
       
-      (define/public (remove-at pos)
+      (define/public (remove-at! pos)
         (define (iter i)
           (when (< (+ i 1) m-size)
             (vector-set! m-vector i (vector-ref m-vector (+ i 1)))
@@ -56,14 +56,14 @@
             (set! m-vector (make-vector m-size))
             (paste-contents m-vector old))))
       
-      (define/public (remove-value val [equality eq?])
+      (define/public (remove-value! val [equality eq?])
         (define (iter i)
           (cond
             ((< i 0)
              #f)
             
             ((equality val (get-at i))
-             (remove-at i)
+             (remove-at! i)
              #t)
             
             (else
@@ -78,6 +78,19 @@
             (else
              #f)))
         (while-rem))
+      
+      (define/public (has-value? val [equality eq?])
+        (define (iter i)
+          (cond
+            ((< i 0)
+             #f)
+            
+            ((equality val (get-at i))
+             #t)
+            
+            (else
+             (iter (- i 1)))))
+        (iter (- (get-size) 1)))
       
       (define/public (get-size)
         m-size)))

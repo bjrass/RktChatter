@@ -1,6 +1,9 @@
 ; This module contains the GUI, and hides all (most?) interactions
 ; with the actual components.
 
+; This implementation is not meant to be fiddeled with from the outside, it is
+; merely an internal abstraction used by the GuiClientInterface% class
+
 (module ChatterGui racket
   (require racket/gui/base)
   (require (file "Common.rkt"))
@@ -39,7 +42,7 @@
       ; -------- LEFT VPANE ----------
       (define left-vpane (new vertical-pane% [parent main-pane]))
       
-      (define conversation-label (new message% [parent left-vpane] [label ""]))
+      (define conversation-label (new message% [parent left-vpane] [label "Conversation"]))
       
       (define conversation-field (new text-field% [parent left-vpane] [label #f] [enabled #f] [style '(multiple)]))
       
@@ -58,7 +61,8 @@
       (define port-field (new text-field% [parent connect-pane] [label "port"] [style '(single)] [init-value "9000"]))
       (define connect-button (new button% [parent right-vpane] [label "connect"]
                                   [callback connect-pressed]))
-      (define udp-checkbox (new check-box% [parent right-vpane] [label "UDP LAN-broadcast"] [callback udp-checker]))
+      ; TODO
+      ; (define udp-checkbox (new check-box% [parent right-vpane] [label "UDP LAN-broadcast"] [callback udp-checker]))
       ; ------------------------------
       
       ; ------------ CONSOLE ---------
@@ -80,10 +84,13 @@
         (send conversation-field set-value conversation))
       
       (define/public (set-udp-checked bool)
-        (send udp-checkbox set-value bool))
+        #f)
+        ; TODO
+        ;(send udp-checkbox set-value bool))
       
       (define/public (get-udp-checked)
-        (send udp-checkbox get-value))
+        #f)
+        ;(send udp-checkbox get-value))
       
       (define/public (set-listener! listener)
         (set! m-listener listener))

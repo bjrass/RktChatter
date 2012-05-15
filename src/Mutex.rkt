@@ -1,6 +1,7 @@
-;; \brief
-;; The mutex is in fact a semaphore, but
-;; most of the time mutexes are what's needed
+;; Implementation of a basic mutex.
+;; Since this internally uses a semaphore,
+;; it is of course a downgrade but
+;; improves simplicity.
 (module Mutex racket
   (define (make-mutex)
     (make-semaphore 1))

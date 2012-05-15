@@ -1,10 +1,17 @@
+;; Contains some useful stuff that is
+;; used in most other definitions
 (module Common racket
   
   ;; Symbol meant to replace racket's inadequate null
-  ;; The main reason why it is inadequate is that it
-  ;; overlaps it's definition with the definition of an
-  ;; empty list (the list is null-terminated WITH the null
-  ;; type, giving it too much purpose)
+  ;; The problem is that, instead of the empty list
+  ;; being a list structure with nulled fields, it
+  ;; is instead null.
+  
+  ;; This is due to the fact that the list is not really
+  ;; a type, it is a concept of pairs being linked together
+  ;; and terminated with null. Since we pretty much have to
+  ;; use that concept, and since it assigns a global meaning to
+  ;; null, null is no longer meaningless, it is the empty list.
   (define TRUE-NULL 'NULL)
   
   (define (TRUE-NULL? something)

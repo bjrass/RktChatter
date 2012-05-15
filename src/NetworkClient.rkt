@@ -7,11 +7,9 @@
   (require (file "RsaEncoder.rkt"))
   (require (file "Queue.rkt"))
   
-  ;; \brief
   ;; Interface for processing messages from a NetworkClient%
   (define NetworkClientListener<%> (interface () client-message client-connect client-disconnect client-connect-fail))
   
-  ;; \brief
   ;; A Client% that is, or can be, connected to
   (define NetworkClient%
     (class Client%
@@ -130,7 +128,7 @@
           (Dbg:feedback (list "NetworkClient " (get-hostname) ":"
                               (get-port)) "codec-update"
                                                     "pub: " (send m-codec get-public-key)
-                                                    " priv:" (send m-codec get-private-key)))
+                                                    " priv: " (send m-codec get-private-key)))
         (unlock-mutex m-codec-mut))
       
       ;; Returns the codec related with this client

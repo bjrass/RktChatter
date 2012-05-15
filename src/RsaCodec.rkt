@@ -3,6 +3,7 @@
   (require (file "Rsa.rkt"))
   (require (file "RsaEncoder.rkt"))
   
+  ;; Bundles everything used in a RSA-encryption
   (define RsaCodec%
     (class object%
       (super-new)

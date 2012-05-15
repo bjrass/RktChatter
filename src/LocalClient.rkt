@@ -7,7 +7,6 @@
   (require (file "ArrayList.rkt"))
   (require (file "Rsa.rkt"))
   (require (file "RsaCodec.rkt"))
-  ; TODO Make encryption cleaner
   ; TODO This class is veery thread-unsafe
   
   ;; \brief
@@ -39,6 +38,8 @@
       (define/public (get-codec)
         m-codec)
       
+      ;; Creates a new encryption with randomized keys
+      ;; and notifies all connected clients
       (define/public (create-encryption!)
         (send m-codec set-keys! (Rsa:make-keys))
         
@@ -61,7 +62,7 @@
           (send client set-listener! this)
           (send client accept-connect inport outport)
           
-          ; TODO
+          ; TODO See definition of clients-changed
           (clients-changed)))
       
       (define (accept-loop)
@@ -115,11 +116,11 @@
            (Dbg:feedback (list "LocalClient \"" (get-username) "\"")
                          "client-message" "Unknown role message from " (send client get-hostname) ":" (send client get-port)))))
       
-      ; TODO Temporary *simple* but ugly solution
+      ; TODO Implemented mostly for short-term simplicity
       (define/public (clients-changed)
         #f)
       
-      ; TODO Temporary *simple* but ugly solution
+      ; TODO Implemented mostly for short-term simplicity
       (define/public (log-update client)
         #f)
       
@@ -137,6 +138,13 @@
           (unlock-mutex m-conn-mut)
           count))
       
+      (define/public (has-client? client)
+        (let ((ret #f))
+          (lock-mutex m-conn-mut)
+          (set! ret (send m-connections has-value? client))
+          (unlock-mutex m-conn-mut)
+          ret))
+      
       (define/public (connect host port-no)
         (let ((client (new NetworkClient% [codec (send m-codec copy)] [hostname host] [port port-no])))
           (lock-mutex m-conn-mut)
@@ -146,15 +154,16 @@
           (send client set-listener! this)
           (send client connect #f)
           
-          ; TODO
+          ; TODO See definition of clients-changed
           (clients-changed)
           client))
       
       (define/public (drop client)
         (lock-mutex m-conn-mut)
-        (when (send m-connections remove-value client)
+        (when (send m-connections remove-value! client)
           (send client request-disconnect))
         (unlock-mutex m-conn-mut)
+        ; TODO See definition of clients-changed
         (clients-changed))
       
       (define/public (is-accepting?) 

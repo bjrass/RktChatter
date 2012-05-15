@@ -2,6 +2,7 @@
   (require (file "Common.rkt"))
   (require (file "Rsa.rkt"))
   
+  ;; Bundles everything necessary to encode messages using a public and common key
   (define RsaEncoder%
     (class object%
       (super-new)

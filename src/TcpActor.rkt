@@ -1,3 +1,6 @@
+;; Intended to simulate tcp connections for debugging purposes
+;; Not finished because the bugs in question was resolved
+
 (require (file "Event.rkt"))
 (require (file "Mutex.rkt"))
 (require (file "Map.rkt"))
@@ -60,6 +63,7 @@
 
 (define (tcpactor:listener-num-wait listener)
   (mcdr (mcdr (mcdr listener))))
+
 (define (tcpactor:listener-set-num-wait listener num)
   (set-mcdr! (mcdr (mcdr listener)) num))
 

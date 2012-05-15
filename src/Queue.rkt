@@ -1,6 +1,7 @@
 (module Queue racket
   (require (file "Common.rkt"))
   
+  ;; A basic implementation of a queue
   (define Queue%
     (class object%
       (super-new)
